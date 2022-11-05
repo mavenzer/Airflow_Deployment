@@ -1,0 +1,70 @@
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
+metadata:
+  name: airflow-webserver
+  namespace: soumen-dev
+  labels:
+    app: airflow
+spec:
+  strategy:
+    type: Rolling
+  triggers:
+    - type: ConfigChange
+    - type: ImageChange
+      imageChangeParams:
+        automatic: true
+        containerNames:
+          - airflow-webserver
+        from:
+          kind: ImageStreamTag
+          namespace: soumen-dev
+          name: "soumen-dev:latest"
+  replicas: 1
+  revisionHistoryLimit: 10
+  paused: false
+  selector:
+    app: airflow
+    deploymentconfig: airflow-webserver
+  template:
+    metadata:
+      labels:
+        name: airflow-webserver
+        app: airflow
+        deploymentconfig: airflow-webserver
+    spec:
+      volumes:
+        - name: airflow-dags
+          persistentVolumeClaim:
+            claimName: airflow-dags
+        - name: airflow-logs
+          persistentVolumeClaim:
+            claimName: airflow-logs
+      containers:
+        - name: airflow-webserver
+          image: soumen-dev/soumen-dev:latest
+          resources:
+            limits:
+              memory: 3Gi
+          env:
+            - name: FERNET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: airflow-secret
+                  key: fernet-key
+            - name: EXECUTOR
+              value: LocalExecutor
+            - name: AIRFLOW__CORE__SQL_ALCHEMY_CONN
+              valueFrom:
+                secretKeyRef:
+                  name: airflow-db
+                  key: sql-alchemy     
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            - name: airflow-dags
+              mountPath: /opt/airflow/dags
+            - name: airflow-logs
+              mountPath: /opt/airflow/logs
+
+
